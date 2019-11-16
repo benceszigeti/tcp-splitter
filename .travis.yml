@@ -8,25 +8,26 @@ addons:
 matrix:
   include:
     - os: linux
-      rust: nightly-2019-03-15
+      rust: stable
       env: TARGET=x86_64-unknown-linux-musl
     - os: linux
-      rust: nightly-2019-03-15
+      rust: stable
       env: TARGET=x86_64-unknown-linux-gnu
     - os: osx
-      rust: nightly-2019-03-15
+      rust: stable
       env: TARGET=x86_64-apple-darwin
 
 script:
   - rustup target add "${TARGET}"
   - cargo test --target "${TARGET}"
   - cargo build --target "${TARGET}" --release
-  - tar -czvf "tcp-splitter-$(git describe)-${TARGET}.tar.gz" -C "target/${TARGET}/release/" "tcp-splitter"
+  - strip "target/${TARGET}/release/tcp-clone"
+  - tar -czvf "tcp-clone-$(git describe)-${TARGET}.tar.gz" -C "target/${TARGET}/release/" "tcp-clone"
 
 deploy:
   provider: releases
   api_key: "${GITHUB_TOKEN}"
-  file: "tcp-splitter-$(git describe)-${TARGET}.tar.gz"
+  file: "tcp-clone-$(git describe)-${TARGET}.tar.gz"
   skip_cleanup: true
   on:
     tags: true

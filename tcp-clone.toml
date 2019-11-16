@@ -1,0 +1,26 @@
+[[tcp_clone]]
+
+  [tcp_clone.server]
+  listen_addr = "127.0.0.1:1202"
+
+  [tcp_clone.target]
+  addr = "127.0.0.1:5000"
+
+  [[tcp_clone.observer]]
+  addr = "127.0.0.1:6000"
+
+  [[tcp_clone.observer]]
+  addr = "127.0.0.1:7000"
+
+# Add more servers:
+#
+#[[tcp_clone]]
+#
+#  [tcp_clone.server]
+#  listen_addr = "127.0.0.1:1111"
+#
+#  [tcp_clone.target]
+#  addr = "127.0.0.1:3333"
+#
+#  [[tcp_clone.observer]]
+#  addr = "127.0.0.1:5555"
