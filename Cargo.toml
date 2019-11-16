@@ -1,5 +1,11 @@
-[workspace]
-members = [
-    "tcp-splitter",
-    "tcp-splitter-cli",
-]
+[package]
+name = "tcp-clone"
+version = "0.99.0"
+authors = ["Bence SZIGETI <bence.szigeti@gohyda.com>"]
+edition = "2018"
+
+[dependencies]
+async-std = { version = "1.0.1", features = ["unstable"] }
+serde = "1.0.102"
+serde_derive = "1.0.102"
+toml = "0.5.5"

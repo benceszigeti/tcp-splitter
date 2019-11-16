@@ -1,14 +1,10 @@
-#![feature(await_macro, async_await, futures_api)]
-
+use async_std::task;
 use std::io::prelude::*;
 use std::io::Write;
-use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::net::{Shutdown, TcpStream};
 use std::thread;
 use std::time::Duration;
-
-use tcp_splitter::run_async_tcp_splitter;
 
 fn echo_server(addr: &str) -> String {
     let server = TcpListener::bind(addr).unwrap();
@@ -29,25 +25,23 @@ fn echo_client(addr: &str, expected: &str) -> String {
     res
 }
 
-fn run_tcp_splitter(
+fn run_tcp_clone(
     listen_addr: &'static str,
-    proxied_addr: &'static str,
-    sniffer_addrs: Vec<&'static str>,
+    target_addr: &'static str,
+    observer_addrs: Vec<&'static str>,
 ) {
     thread::spawn(move || {
-        tokio::run_async(
-            async move {
-                await!(run_async_tcp_splitter(
-                    listen_addr.parse::<SocketAddr>().unwrap(),
-                    proxied_addr.parse::<SocketAddr>().unwrap(),
-                    sniffer_addrs
-                        .iter()
-                        .map(|addr| addr.parse::<SocketAddr>().unwrap())
-                        .collect(),
-                ))
-                .unwrap();
-            },
-        );
+        task::block_on(async move {
+            let _ = tcp_clone::accept_loop(
+                listen_addr.parse().unwrap(),
+                target_addr.parse().unwrap(),
+                observer_addrs
+                    .iter()
+                    .map(|addr| addr.parse().unwrap())
+                    .collect(),
+            )
+            .await;
+        })
     });
 }
 
@@ -59,14 +53,14 @@ fn echo_server_client() {
 
 #[test]
 fn echo_server_proxy() {
-    run_tcp_splitter("127.0.0.1:1111", "127.0.0.1:2001", vec![]);
+    run_tcp_clone("127.0.0.1:1111", "127.0.0.1:2001", vec![]);
     thread::spawn(|| assert_eq!("hello", echo_server("127.0.0.1:2001")));
     assert_eq!("hello", echo_client("127.0.0.1:1111", "hello"));
 }
 
 #[test]
-fn echo_server_proxy_with_sniffers() {
-    run_tcp_splitter(
+fn echo_server_proxy_with_observers() {
+    run_tcp_clone(
         "127.0.0.1:2222",
         "127.0.0.1:2002",
         vec!["127.0.0.1:3002", "127.0.0.1:4002"],
