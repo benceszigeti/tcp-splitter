@@ -15,6 +15,9 @@
     <a href="https://github.com/benceszigeti/tcp-clone/releases/">
         <img src="https://img.shields.io/github/release/benceszigeti/tcp-clone.svg?style=flat-square" alt="Latest release" />
     </a>
+    <a href="https://docs.rs/tcp-clone/">
+	<img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square" alt="docs.rs docs" />
+    </a>
     <a href="LICENSE">
         <img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License" />
     </a>
