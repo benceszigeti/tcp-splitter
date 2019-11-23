@@ -1,10 +1,15 @@
 [package]
 name = "tcp-clone"
 version = "0.99.2"
-authors = ["Bence SZIGETI <bence.szigeti@gohyda.com>"]
-license = "MIT"
+
 description = "TCP proxy server with ability to send the client upstream to observers."
+
+authors = ["Bence SZIGETI <bence.szigeti@gohyda.com>"]
+
 edition = "2018"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/benceszigeti/tcp-clone/"
 
 [dependencies]
 async-std = { version = "1.1.0", features = ["unstable"] }
