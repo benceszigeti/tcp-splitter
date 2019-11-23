@@ -28,14 +28,19 @@ fn echo_client(addr: &str, expected: &str) -> String {
 fn run_tcp_clone(
     listen_addr: &'static str,
     target_addr: &'static str,
-    observer_addrs: Vec<&'static str>,
+    client_tx_observer_addrs: Vec<&'static str>,
+    client_rx_observer_addrs: Vec<&'static str>,
 ) {
     thread::spawn(move || {
         task::block_on(async move {
-            let _ = tcp_clone::accept_loop(
+            let _ = tcp_clone::run(
                 listen_addr.parse().unwrap(),
                 target_addr.parse().unwrap(),
-                observer_addrs
+                client_tx_observer_addrs
+                    .iter()
+                    .map(|addr| addr.parse().unwrap())
+                    .collect(),
+                client_rx_observer_addrs
                     .iter()
                     .map(|addr| addr.parse().unwrap())
                     .collect(),
@@ -53,7 +58,7 @@ fn echo_server_client() {
 
 #[test]
 fn echo_server_proxy() {
-    run_tcp_clone("127.0.0.1:1111", "127.0.0.1:2001", vec![]);
+    run_tcp_clone("127.0.0.1:1111", "127.0.0.1:2001", vec![], vec![]);
     thread::spawn(|| assert_eq!("hello", echo_server("127.0.0.1:2001")));
     assert_eq!("hello", echo_client("127.0.0.1:1111", "hello"));
 }
@@ -64,6 +69,7 @@ fn echo_server_proxy_with_observers() {
         "127.0.0.1:2222",
         "127.0.0.1:2002",
         vec!["127.0.0.1:3002", "127.0.0.1:4002"],
+        vec![],
     );
     thread::spawn(|| assert_eq!("hello", echo_server("127.0.0.1:2002")));
     thread::spawn(|| assert_eq!("hello", echo_server("127.0.0.1:3002")));

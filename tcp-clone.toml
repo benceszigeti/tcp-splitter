@@ -6,13 +6,16 @@
   [tcp_clone.target]
   addr = "127.0.0.1:5000"
 
-  [[tcp_clone.observer]]
+  [[tcp_clone.client_tx_observer]]
   addr = "127.0.0.1:6000"
 
-  [[tcp_clone.observer]]
+  [[tcp_clone.client_tx_observer]]
   addr = "127.0.0.1:7000"
 
-# Add more servers:
+  [[tcp_clone.client_rx_observer]]
+  addr = "127.0.0.1:8000"
+
+# Multiple servers:
 #
 #[[tcp_clone]]
 #
@@ -22,5 +25,5 @@
 #  [tcp_clone.target]
 #  addr = "127.0.0.1:3333"
 #
-#  [[tcp_clone.observer]]
+#  [[tcp_clone.client_tx_observer]]
 #  addr = "127.0.0.1:5555"

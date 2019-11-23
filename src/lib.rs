@@ -1,112 +1,53 @@
 use async_std::io;
-use async_std::net::{SocketAddr, TcpListener, TcpStream};
+use async_std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use async_std::prelude::*;
 use async_std::sync::channel;
 use async_std::sync::Arc;
 use async_std::task;
-use std::net::Shutdown;
 
-const BUFFER_LEN: usize = 65535;
-const CHANNEL_LEN: usize = 1024;
-
-type Sender = async_std::sync::Sender<Arc<Vec<u8>>>;
 type Receiver = async_std::sync::Receiver<Arc<Vec<u8>>>;
+type Sender = async_std::sync::Sender<Arc<Vec<u8>>>;
 
-pub async fn accept_loop(
-    listen_addr: SocketAddr,
+struct Addresses {
     target_addr: SocketAddr,
-    observer_addrs: Vec<SocketAddr>,
-) -> io::Result<()> {
-    let target_addr = Arc::new(target_addr);
-    let observer_addrs = Arc::new(observer_addrs);
+    tx_observer_addrs: Vec<SocketAddr>,
+    rx_observer_addrs: Vec<SocketAddr>,
+}
 
-    let listener = TcpListener::bind(listen_addr).await?;
-    let mut incoming = listener.incoming();
-    while let Some(client_stream) = incoming.next().await {
-        if let Ok(client_stream) = client_stream {
-            let target_addr = target_addr.clone();
-            let observer_addrs = observer_addrs.clone();
-            task::spawn(async move {
-                let _ = proxy_loop(client_stream, target_addr, observer_addrs).await;
-            });
+impl Addresses {
+    fn new(
+        target_addr: SocketAddr,
+        tx_observer_addrs: Vec<SocketAddr>,
+        rx_observer_addrs: Vec<SocketAddr>,
+    ) -> Addresses {
+        Addresses {
+            target_addr,
+            tx_observer_addrs,
+            rx_observer_addrs,
+        }
+    }
+}
+
+struct Broadcaster {
+    txs: Vec<Sender>,
+}
+
+impl Broadcaster {
+    fn with_capacity(n: usize) -> Broadcaster {
+        Broadcaster {
+            txs: Vec::with_capacity(n + 1),
         }
     }
 
-    Ok(())
-}
-
-async fn proxy_loop(
-    client_stream: TcpStream,
-    target_addr: Arc<SocketAddr>,
-    observer_addrs: Arc<Vec<SocketAddr>>,
-) -> io::Result<()> {
-    let target_stream = TcpStream::connect(*target_addr).await?;
-    let target_stream = Arc::new(target_stream);
-    task::spawn(async move {
-        let mut channels: Vec<Sender> = Vec::with_capacity(observer_addrs.len() + 1);
-
-        for observer_addr in observer_addrs.iter() {
-            let (client_sender, observer_receiver) = channel(CHANNEL_LEN);
-            channels.push(client_sender);
-            let observer_addr = *observer_addr;
-            task::spawn(async move {
-                let _ = observer_loop(observer_addr, observer_receiver).await;
-            });
-        }
-
-        let client_stream = Arc::new(client_stream);
-        let (client_reader, client_writer) = (client_stream.clone(), client_stream);
-
-        let (client_sender, target_receiver) = channel(CHANNEL_LEN);
-        channels.push(client_sender);
-        task::spawn(async move {
-            let _ = target_loop(target_stream, target_receiver, client_writer).await;
-        });
-        task::spawn(async move {
-            let _ = client_read_loop(client_reader, channels).await;
-        });
-    });
-    Ok(())
-}
-
-async fn target_loop(
-    target_stream: Arc<TcpStream>,
-    client_broadcast_receiver: Receiver,
-    client_stream: Arc<TcpStream>,
-) -> io::Result<()> {
-    let (target_reader, target_writer) = (target_stream.clone(), target_stream);
-    task::spawn(async move {
-        let _ = target_read_loop(target_reader, client_stream).await;
-    });
-    let mut target_writer = &*target_writer;
-    while let Some(data) = client_broadcast_receiver.recv().await {
-        target_writer.write_all(&data).await?;
+    fn new_receiver(&mut self) -> Receiver {
+        let (sender, receiver) = channel(1024);
+        self.txs.push(sender);
+        receiver
     }
-    target_writer.shutdown(Shutdown::Write)?;
-    Ok(())
-}
 
-async fn observer_loop(
-    observer_addr: SocketAddr,
-    client_broadcast_receiver: Receiver,
-) -> io::Result<()> {
-    let mut observer_stream = TcpStream::connect(observer_addr).await?;
-    while let Some(data) = client_broadcast_receiver.recv().await {
-        observer_stream.write_all(&data).await?;
-    }
-    Ok(())
-}
-
-async fn client_read_loop(client_stream: Arc<TcpStream>, txs: Vec<Sender>) -> io::Result<()> {
-    let mut client_stream = &*client_stream;
-    let mut buf = vec![0u8; BUFFER_LEN];
-    loop {
-        let n = client_stream.read(&mut buf).await?;
-        if n == 0 {
-            break;
-        }
-        let data = Arc::new(buf[..n].to_vec());
-        for tx in txs.iter() {
+    fn write(&mut self, data: Vec<u8>) {
+        let data = Arc::new(data);
+        for tx in self.txs.iter() {
             let tx = tx.clone();
             let data = data.clone();
             task::spawn(async move {
@@ -114,23 +55,87 @@ async fn client_read_loop(client_stream: Arc<TcpStream>, txs: Vec<Sender>) -> io
             });
         }
     }
+}
+
+pub async fn run(
+    listen_addr: SocketAddr,
+    target_addr: SocketAddr,
+    tx_observer_addrs: Vec<SocketAddr>,
+    rx_observer_addrs: Vec<SocketAddr>,
+) -> io::Result<()> {
+    let addrs = Arc::new(Addresses::new(
+        target_addr,
+        tx_observer_addrs,
+        rx_observer_addrs,
+    ));
+    let listener = TcpListener::bind(listen_addr).await?;
+    let mut incoming = listener.incoming();
+    while let Some(client_stream) = incoming.next().await {
+        if let Ok(client_stream) = client_stream {
+            let addrs = addrs.clone();
+            task::spawn(async move {
+                handle_client(client_stream, addrs).await;
+            });
+        }
+    }
     Ok(())
 }
 
-async fn target_read_loop(
-    target_stream: Arc<TcpStream>,
-    client_stream: Arc<TcpStream>,
-) -> io::Result<()> {
-    let mut client_stream = &*client_stream;
-    let mut target_stream = &*target_stream;
-    let mut buf = vec![0u8; BUFFER_LEN];
+async fn handle_client(client_stream: TcpStream, addrs: Arc<Addresses>) {
+    if let Ok(target_stream) = TcpStream::connect(addrs.target_addr).await {
+        let mut client_tx_broadcaster = spawn_observer_write_loops(&addrs.tx_observer_addrs);
+        let mut client_rx_broadcaster = spawn_observer_write_loops(&addrs.rx_observer_addrs);
+        let target_receiver = client_tx_broadcaster.new_receiver();
+        let client_receiver = client_rx_broadcaster.new_receiver();
+        spawn_read_write_loop(target_stream, target_receiver, client_rx_broadcaster);
+        spawn_read_write_loop(client_stream, client_receiver, client_tx_broadcaster);
+    }
+}
+
+fn spawn_observer_write_loops(addrs: &[SocketAddr]) -> Broadcaster {
+    let mut broadcaster = Broadcaster::with_capacity(addrs.len() + 1);
+    for addr in addrs.iter() {
+        let addr = *addr;
+        let receiver = broadcaster.new_receiver();
+        task::spawn(async move {
+            if let Ok(stream) = TcpStream::connect(addr).await {
+                let _ = write_loop(&stream, receiver).await;
+            }
+        });
+    }
+    broadcaster
+}
+
+fn spawn_read_write_loop(stream: TcpStream, rx: Receiver, broadcaster: Broadcaster) {
+    let stream = Arc::new(stream);
+    let (reader, writer) = (stream.clone(), stream);
+    task::spawn(async move {
+        let reader = &*reader;
+        let _ = read_loop(reader, broadcaster).await;
+        let _ = reader.shutdown(Shutdown::Read);
+    });
+    task::spawn(async move {
+        let writer = &*writer;
+        let _ = write_loop(&writer, rx).await;
+        let _ = writer.shutdown(Shutdown::Write);
+    });
+}
+
+async fn write_loop(mut stream: &TcpStream, rx: Receiver) -> io::Result<()> {
+    while let Some(data) = rx.recv().await {
+        stream.write_all(&data).await?;
+    }
+    Ok(())
+}
+
+async fn read_loop(mut stream: &TcpStream, mut broadcaster: Broadcaster) -> io::Result<()> {
+    let mut buf = [0; 65535];
     loop {
-        let n = target_stream.read(&mut buf).await?;
+        let n = stream.read(&mut buf).await?;
         if n == 0 {
-            client_stream.shutdown(Shutdown::Write)?;
             break;
         }
-        client_stream.write_all(&buf[..n]).await?;
+        broadcaster.write(buf[..n].to_vec());
     }
     Ok(())
 }

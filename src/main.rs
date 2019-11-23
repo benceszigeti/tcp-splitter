@@ -18,7 +18,8 @@ struct Config {
 struct TcpCloneConfig {
     server: ServerConfig,
     target: TargetConfig,
-    observer: Vec<ObserverConfig>,
+    client_tx_observer: Option<Vec<ClientTxObserverConfig>>,
+    client_rx_observer: Option<Vec<ClientRxObserverConfig>>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -31,19 +32,38 @@ struct TargetConfig {
     addr: SocketAddr,
 }
 
-#[derive(Deserialize, Clone)]
-struct ObserverConfig {
-    addr: SocketAddr,
-}
+type ClientTxObserverConfig = TargetConfig;
+type ClientRxObserverConfig = TargetConfig;
 
 async fn tcp_clone_task(
     tcp_clone_cfg: TcpCloneConfig,
 ) -> task::JoinHandle<std::result::Result<(), std::io::Error>> {
     task::spawn(async move {
-        tcp_clone::accept_loop(
+        let client_tx_observers = if tcp_clone_cfg.client_tx_observer.is_some() {
+            tcp_clone_cfg
+                .client_tx_observer
+                .unwrap()
+                .iter()
+                .map(|cfg| cfg.addr)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let client_rx_observers = if tcp_clone_cfg.client_rx_observer.is_some() {
+            tcp_clone_cfg
+                .client_rx_observer
+                .unwrap()
+                .iter()
+                .map(|cfg| cfg.addr)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        tcp_clone::run(
             tcp_clone_cfg.server.listen_addr,
             tcp_clone_cfg.target.addr,
-            tcp_clone_cfg.observer.iter().map(|o| o.addr).collect(),
+            client_tx_observers,
+            client_rx_observers,
         )
         .await
     })
