@@ -1,7 +1,9 @@
 [package]
 name = "tcp-clone"
-version = "0.99.1"
+version = "0.99.2"
 authors = ["Bence SZIGETI <bence.szigeti@gohyda.com>"]
+license = "MIT"
+description = "TCP proxy server with ability to send the client upstream to observers."
 edition = "2018"
 
 [dependencies]
