@@ -75,12 +75,10 @@ fn main() {
             eprintln!("`{}` not found.", cfg_path);
         } else if err.kind() == InvalidData {
             eprintln!("invalid config.");
-            eprintln!("error: {}", err);
         } else {
             eprintln!("unknown error.");
-            eprintln!("error: {}", err);
-            dbg!(err);
         }
+        eprintln!("details: '{}'", err);
         exit(1);
     }
     exit(0);
