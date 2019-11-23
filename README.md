@@ -89,7 +89,7 @@ Download a [released](https://github.com/benceszigeti/tcp-clone/releases/) versi
 ## Usage
 
 ```sh
-$ tcp-clone [CONFIGFILE]
+$ tcp-clone --help
 ```
 
 ## Configuration file

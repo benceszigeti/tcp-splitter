@@ -13,6 +13,7 @@ repository = "https://github.com/benceszigeti/tcp-clone/"
 
 [dependencies]
 async-std = { version = "1.1.0", features = ["unstable"] }
+clap = "2.33.0"
 serde = "1.0.102"
 serde_derive = "1.0.102"
 toml = "0.5.5"

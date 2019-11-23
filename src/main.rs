@@ -2,9 +2,12 @@ use async_std::fs;
 use async_std::io;
 use async_std::net::SocketAddr;
 use async_std::task;
+use clap::{App, Arg};
 use serde_derive::Deserialize;
-use std::env::args;
 use std::process::exit;
+
+#[macro_use]
+extern crate clap;
 
 #[derive(Deserialize, Clone)]
 struct Config {
@@ -60,11 +63,24 @@ async fn run(cfg_path: &str) -> io::Result<()> {
 }
 
 fn main() {
-    let cfg_path = args()
-        .nth(1)
-        .unwrap_or_else(|| "tcp-clone.toml".to_string());
+    let cli = App::new(crate_name!())
+        .version(&format!("v{}", crate_version!())[..])
+        .author(crate_authors!())
+        .about(crate_description!())
+        .arg(
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file")
+                .takes_value(true)
+                .default_value("tcp-clone.toml"),
+        )
+        .get_matches();
+    let cfg_path = cli.value_of("config").unwrap();
+
     if let Err(err) = task::block_on(async {
-        let cfg_path = cfg_path.clone();
+        let cfg_path = &(*cfg_path);
         run(&cfg_path).await
     }) {
         use async_std::io::ErrorKind::{AddrInUse, InvalidData, NotFound};
