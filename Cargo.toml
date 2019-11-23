@@ -1,8 +1,8 @@
 [package]
 name = "tcp-clone"
-version = "0.99.2"
+version = "0.99.3"
 
-description = "TCP proxy server with ability to send the client upstream to observers."
+description = "TCP proxy server with ability to send client upstream to observers."
 
 authors = ["Bence SZIGETI <bence.szigeti@gohyda.com>"]
 

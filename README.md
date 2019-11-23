@@ -1,33 +1,27 @@
-[![Build status][build-badge]][build-url]
-[![Version][version-badge]][version-url]
-[![MIT licensed][mit-badge]][mit-url]
+<h1 align="center">tcp-clone</h1>
+<div align="center">
+    <strong>TCP proxy server with ability to send client upstream to observers.</strong>
+</div>
 
-[build-badge]: https://travis-ci.com/benceszigeti/tcp-clone.svg?branch=master
-[build-url]: https://travis-ci.com/benceszigeti/tcp-clone
-[version-badge]: https://img.shields.io/github/release/benceszigeti/tcp-clone.svg
-[version-url]: https://github.com/benceszigeti/tcp-clone/releases/latest
-[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
-[mit-url]: LICENSE
+<br />
+
+<div align="center">
+    <a href="https://travis-ci.com/benceszigeti/tcp-clone/">
+        <img src="https://img.shields.io/travis/benceszigeti/tcp-clone?style=flat-square" alt="Build status" />
+    </a>
+    <a href="https://crates.io/crates/tcp-clone/">
+        <img src="https://img.shields.io/crates/v/tcp-clone.svg?style=flat-square" alt="crates.io version" />
+    </a>
+    <a href="https://github.com/benceszigeti/tcp-clone/releases/">
+        <img src="https://img.shields.io/github/release/benceszigeti/tcp-clone.svg?style=flat-square" alt="Latest release" />
+    </a>
+    <a href="LICENSE">
+        <img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License" />
+    </a>
+</div>
+
+## Architecture
 ```
-             .                                          oooo                                  
-           .o8                                          `888                                  
-         .o888oo  .ooooo.  oo.ooooo.           .ooooo.   888   .ooooo.  ooo. .oo.    .ooooo.  
-           888   d88' `"Y8  888' `88b         d88' `"Y8  888  d88' `88b `888P"Y88b  d88' `88b 
-           888   888        888   888 8888888 888        888  888   888  888   888  888ooo888 
-           888 . 888   .o8  888   888         888   .o8  888  888   888  888   888  888    .o 
-           "888" `Y8bod8P'  888bod8P'         `Y8bod8P' o888o `Y8bod8P' o888o o888o `Y8bod8P' 
-                            888                                                               
-                           o888o                                                              
-
-=========================================================================================================
-Description:  TCP proxy server with ability to send the client upstream to observers.
-
-WARNING:      The application is highly parallelized. Slow receivers can increase memory usage.
-=========================================================================================================
-
-
-ARCHITECTURE:
-=============
                                Simple proxy                                   ...with client TX observers:
 #########################################################################                                 
 #                                                                       #                                 
@@ -76,13 +70,33 @@ ARCHITECTURE:
 #  |            |            |             |            |            |  #              | #3           |  |
 #  +------------+            +-------------+            +------------+  #              +--------------+  |
 #########################################################################               +----------------+
+```
 
-                             This project is licensed under the MIT license.
-                       Copyright (c) 2019 Bence SZIGETI <bence.szigeti@gohyda.com>
+## Installation
+
+### From source
+
+With [cargo](https://rustup.rs/) installed run:
+
+```sh
+$ cargo install tcp-clone
 ```
+
+### Pre-builds
+
+Download a [released](https://github.com/benceszigeti/tcp-clone/releases/) version.
+
+## Usage
+
+```sh
+$ tcp-clone [CONFIGFILE]
 ```
-CONFIG:
-=======
+
+## Configuration file
+
+### Example
+
+```toml
 [[tcp_clone]]
 
   [tcp_clone.server]
@@ -109,24 +123,37 @@ CONFIG:
 #
 #  [[tcp_clone.observer]]
 #  addr = "127.0.0.1:5555"
+```
 
-Try it with iperf:
-==================
+## Demo
 
-$ ./tcp-clone abovecfg.toml                       # `tcp-clone` server
+### With `iperf`
+
+```sh
+$ tcp-clone tcp-clone.toml                        # `tcp-clone` server
 $ iperf -s -p 5000 -b 800Mbits/sec                # Target server
 $ iperf -s -p 6000 -b 1Gbytes/sec                 # Observer #1
 $ iperf -s -p 7000 -b 500Mbits/sec                # Observer #2
-$ iperf -c 127.0.0.1 -p 1202 -n 250Mbytes -P 4    # Run
+$ iperf -c 127.0.0.1 -p 1202 -n 250Mbytes -P 4
+```
 
-Try it with netcat:
-===================
+### With `netcat`
 
-$ ./tcp-clone abovecfg.toml
+```sh
+$ tcp-clone tcp-clone.toml
 $ nc -l -p 5000
 $ nc -l -p 6000
 $ nc -l -p 7000
 $ nc 127.0.0.1 1202
-
-...and now type into the netcat instances...
+$ # ...and now type into the netcat instances...
 ```
+
+## License
+
+<div align="center">
+<sup>
+This project is licensed under the <a href="LICENSE">MIT license</a>.
+<br/>
+Copyright &copy; 2019 Bence SZIGETI &lt;bence.szigeti@gohyda.com&gt;
+</sup>
+</div>
