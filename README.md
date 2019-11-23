@@ -133,17 +133,17 @@ $ tcp-clone --help
 ### With `iperf`
 
 ```sh
-$ tcp-clone tcp-clone.toml                        # `tcp-clone` server
-$ iperf -s -p 5000 -b 800Mbits/sec                # Target server
-$ iperf -s -p 6000 -b 1Gbytes/sec                 # Observer #1
-$ iperf -s -p 7000 -b 500Mbits/sec                # Observer #2
+$ tcp-clone --config tcp-clone.toml      # `tcp-clone` server
+$ iperf -s -p 5000 -b 800Mbits/sec       # Target server
+$ iperf -s -p 6000 -b 1Gbytes/sec        # Observer #1
+$ iperf -s -p 7000 -b 500Mbits/sec       # Observer #2
 $ iperf -c 127.0.0.1 -p 1202 -n 250Mbytes -P 4
 ```
 
 ### With `netcat`
 
 ```sh
-$ tcp-clone tcp-clone.toml
+$ tcp-clone --config tcp-clone.toml
 $ nc -l -p 5000
 $ nc -l -p 6000
 $ nc -l -p 7000
