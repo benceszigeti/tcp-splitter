@@ -40,6 +40,8 @@ async fn proxy_loop(
     target_addr: Arc<SocketAddr>,
     observer_addrs: Arc<Vec<SocketAddr>>,
 ) -> io::Result<()> {
+    let target_stream = TcpStream::connect(*target_addr).await?;
+    let target_stream = Arc::new(target_stream);
     task::spawn(async move {
         let mut channels: Vec<Sender> = Vec::with_capacity(observer_addrs.len() + 1);
 
@@ -58,7 +60,7 @@ async fn proxy_loop(
         let (client_sender, target_receiver) = channel(CHANNEL_LEN);
         channels.push(client_sender);
         task::spawn(async move {
-            let _ = target_loop(target_addr, target_receiver, client_writer).await;
+            let _ = target_loop(target_stream, target_receiver, client_writer).await;
         });
         task::spawn(async move {
             let _ = client_read_loop(client_reader, channels).await;
@@ -68,12 +70,10 @@ async fn proxy_loop(
 }
 
 async fn target_loop(
-    target_addr: Arc<SocketAddr>,
+    target_stream: Arc<TcpStream>,
     client_broadcast_receiver: Receiver,
     client_stream: Arc<TcpStream>,
 ) -> io::Result<()> {
-    let target_stream = TcpStream::connect(*target_addr).await?;
-    let target_stream = Arc::new(target_stream);
     let (target_reader, target_writer) = (target_stream.clone(), target_stream);
     task::spawn(async move {
         let _ = target_read_loop(target_reader, client_stream).await;
