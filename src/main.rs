@@ -1,6 +1,7 @@
 use async_std::fs;
 use async_std::io;
-use async_std::net::SocketAddr;
+use async_std::net::{SocketAddr, ToSocketAddrs};
+use async_std::sync::Arc;
 use async_std::task;
 use clap::{App, Arg};
 use serde_derive::Deserialize;
@@ -9,12 +10,12 @@ use std::process::exit;
 #[macro_use]
 extern crate clap;
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 struct Config {
     tcp_clone: Vec<TcpCloneConfig>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 struct TcpCloneConfig {
     server: ServerConfig,
     target: TargetConfig,
@@ -22,48 +23,83 @@ struct TcpCloneConfig {
     client_rx_observer: Option<Vec<ClientRxObserverConfig>>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 struct ServerConfig {
-    listen_addr: SocketAddr,
+    listen_addr: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 struct TargetConfig {
-    addr: SocketAddr,
+    addr: String,
 }
 
 type ClientTxObserverConfig = TargetConfig;
 type ClientRxObserverConfig = TargetConfig;
 
-async fn tcp_clone_task(
+async fn resolve_addrs(addrs: Vec<&String>) -> io::Result<Vec<SocketAddr>> {
+    let mut tasks: Vec<task::JoinHandle<io::Result<SocketAddr>>> = Vec::with_capacity(addrs.len());
+
+    let mut res = Vec::with_capacity(addrs.len());
+    for addr in addrs.iter() {
+        let addr = (*addr).clone();
+        let task = task::spawn(async move { Ok(addr.to_socket_addrs().await?.next().unwrap()) });
+        tasks.push(task);
+    }
+
+    for task in tasks {
+        res.push(task.await?);
+    }
+
+    Ok(res)
+}
+
+async fn resolve_addr(addr: &str) -> io::Result<SocketAddr> {
+    Ok(addr.to_socket_addrs().await?.next().unwrap())
+}
+
+async fn resolve_observer_addrs(
+    observer_cfg: &[ClientTxObserverConfig],
+) -> io::Result<Vec<SocketAddr>> {
+    let mut addrs = Vec::new();
+    for cfg in observer_cfg.iter() {
+        addrs.push(&cfg.addr);
+    }
+    resolve_addrs(addrs).await
+}
+
+async fn spawn_tcp_clone_task(
     tcp_clone_cfg: TcpCloneConfig,
 ) -> task::JoinHandle<std::result::Result<(), std::io::Error>> {
     task::spawn(async move {
-        let client_tx_observers = if tcp_clone_cfg.client_tx_observer.is_some() {
-            tcp_clone_cfg
-                .client_tx_observer
-                .unwrap()
-                .iter()
-                .map(|cfg| cfg.addr)
-                .collect()
-        } else {
-            Vec::new()
-        };
-        let client_rx_observers = if tcp_clone_cfg.client_rx_observer.is_some() {
-            tcp_clone_cfg
-                .client_rx_observer
-                .unwrap()
-                .iter()
-                .map(|cfg| cfg.addr)
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let tcp_clone_cfg = Arc::new(tcp_clone_cfg);
+
+        let cfg = tcp_clone_cfg.clone();
+        let client_tx_observers = task::spawn(async move {
+            if cfg.client_tx_observer.is_none() {
+                return Ok(vec![]);
+            }
+            resolve_observer_addrs(&cfg.client_tx_observer.as_ref().unwrap()).await
+        });
+
+        let cfg = tcp_clone_cfg.clone();
+        let client_rx_observers = task::spawn(async move {
+            if cfg.client_rx_observer.is_none() {
+                return Ok(vec![]);
+            }
+            resolve_observer_addrs(&cfg.client_rx_observer.as_ref().unwrap()).await
+        });
+
+        let cfg = tcp_clone_cfg.clone();
+        let listen_addr = task::spawn(async move { resolve_addr(&cfg.server.listen_addr).await });
+
+        let cfg = tcp_clone_cfg.clone();
+        let target_addr = task::spawn(async move { resolve_addr(&cfg.target.addr).await });
+
         tcp_clone::run(
-            tcp_clone_cfg.server.listen_addr,
-            tcp_clone_cfg.target.addr,
-            client_tx_observers,
-            client_rx_observers,
+            listen_addr.await?,
+            target_addr.await?,
+            client_tx_observers.await?,
+            client_rx_observers.await?,
         )
         .await
     })
@@ -74,7 +110,7 @@ async fn run(cfg_path: &str) -> io::Result<()> {
     let cfg: Config = toml::from_str(&cfg)?;
     let mut servers: Vec<task::JoinHandle<std::result::Result<(), std::io::Error>>> = vec![];
     for tcp_clone in cfg.tcp_clone {
-        servers.push(tcp_clone_task(tcp_clone.clone()).await);
+        servers.push(spawn_tcp_clone_task(tcp_clone).await);
     }
     for server in servers {
         server.await?
