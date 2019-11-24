@@ -112,12 +112,10 @@ fn spawn_read_write_loop(stream: TcpStream, rx: Receiver, broadcaster: Broadcast
     task::spawn(async move {
         let reader = &*reader;
         let _ = read_loop(reader, broadcaster).await;
-        let _ = reader.shutdown(Shutdown::Read);
     });
     task::spawn(async move {
         let writer = &*writer;
         let _ = write_loop(&writer, rx).await;
-        let _ = writer.shutdown(Shutdown::Write);
     });
 }
 
@@ -125,6 +123,7 @@ async fn write_loop(mut stream: &TcpStream, rx: Receiver) -> io::Result<()> {
     while let Some(data) = rx.recv().await {
         stream.write_all(&data).await?;
     }
+    let _ = stream.shutdown(Shutdown::Write);
     Ok(())
 }
 
@@ -137,5 +136,6 @@ async fn read_loop(mut stream: &TcpStream, mut broadcaster: Broadcaster) -> io::
         }
         broadcaster.write(buf[..n].to_vec());
     }
+    let _ = stream.shutdown(Shutdown::Read);
     Ok(())
 }
