@@ -25,7 +25,7 @@ struct TcpCloneConfig {
 
 #[derive(Deserialize)]
 struct ServerConfig {
-    listen_addr: String,
+    listen_addr: SocketAddr,
 }
 
 #[derive(Deserialize)]
@@ -90,13 +90,11 @@ async fn spawn_tcp_clone_task(
         });
 
         let cfg = tcp_clone_cfg.clone();
-        let listen_addr = task::spawn(async move { resolve_addr(&cfg.server.listen_addr).await });
-
-        let cfg = tcp_clone_cfg.clone();
         let target_addr = task::spawn(async move { resolve_addr(&cfg.target.addr).await });
 
+        let cfg = tcp_clone_cfg.clone();
         tcp_clone::run(
-            listen_addr.await?,
+            cfg.server.listen_addr,
             target_addr.await?,
             client_tx_observers.await?,
             client_rx_observers.await?,

@@ -1,7 +1,7 @@
 [[tcp_clone]]
 
   [tcp_clone.server]
-  listen_addr = "127.0.0.1:1202"
+  listen_addr = "[::]:1202"
 
   [tcp_clone.target]
   addr = "127.0.0.1:5000"
