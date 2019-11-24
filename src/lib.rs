@@ -83,8 +83,8 @@ pub async fn run(
 
 async fn handle_client(client_stream: TcpStream, addrs: Arc<Addresses>) {
     if let Ok(target_stream) = TcpStream::connect(addrs.target_addr).await {
-        let mut client_tx_broadcaster = spawn_observer_write_loops(&addrs.tx_observer_addrs);
-        let mut client_rx_broadcaster = spawn_observer_write_loops(&addrs.rx_observer_addrs);
+        let mut client_tx_broadcaster = spawn_observers_write_loop(&addrs.tx_observer_addrs);
+        let mut client_rx_broadcaster = spawn_observers_write_loop(&addrs.rx_observer_addrs);
         let target_receiver = client_tx_broadcaster.new_receiver();
         let client_receiver = client_rx_broadcaster.new_receiver();
         spawn_read_write_loop(target_stream, target_receiver, client_rx_broadcaster);
@@ -92,7 +92,7 @@ async fn handle_client(client_stream: TcpStream, addrs: Arc<Addresses>) {
     }
 }
 
-fn spawn_observer_write_loops(addrs: &[SocketAddr]) -> Broadcaster {
+fn spawn_observers_write_loop(addrs: &[SocketAddr]) -> Broadcaster {
     let mut broadcaster = Broadcaster::with_capacity(addrs.len() + 1);
     for addr in addrs.iter() {
         let addr = *addr;
