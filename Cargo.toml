@@ -1,6 +1,6 @@
 [package]
 name = "tcp-clone"
-version = "0.99.3"
+version = "0.99.4"
 
 description = "TCP proxy server with ability to send client up- and/or downstream to observer(s)."
 
