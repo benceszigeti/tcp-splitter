@@ -35,7 +35,7 @@ struct Broadcaster {
 impl Broadcaster {
     fn with_capacity(n: usize) -> Broadcaster {
         Broadcaster {
-            txs: Vec::with_capacity(n + 1),
+            txs: Vec::with_capacity(n),
         }
     }
 
